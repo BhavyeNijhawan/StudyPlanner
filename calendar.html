@@ -1,0 +1,827 @@
+<html>
+<head>
+    <title>Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet"/>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const API_URL = 'http://localhost:5500/api';
+            const today = new Date();
+            const todayString = today.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+            const weekDays = Array.from(document.querySelectorAll('.week-day'));
+            const todayButton = document.getElementById('today-button');
+            const weekButton = document.getElementById('week-button');
+            const monthButton = document.getElementById('month-button');
+            const calendarTable = document.getElementById('calendar-table');
+            const weekView = document.getElementById('week-view');
+            const monthView = document.getElementById('month-view');
+            const leftArrow = document.getElementById('left-arrow');
+            const rightArrow = document.getElementById('right-arrow');
+            const dateRange = document.getElementById('date-range');
+
+            let currentDate = new Date();
+            let weekTasks = [];
+            let weekExams = [];
+
+            async function fetchWeekTasks(startDate, endDate) {
+                try {
+                    // Fetch tasks
+                    const tasksResponse = await fetch(`${API_URL}/tasks`);
+                    const tasks = await tasksResponse.json();
+                    weekTasks = tasks.filter(task => {
+                        const taskDate = new Date(task.dueDate);
+                        return taskDate >= startDate && taskDate <= endDate;
+                    });
+
+                    // Fetch exams
+                    const examsResponse = await fetch(`${API_URL}/exams`);
+                    const exams = await examsResponse.json();
+                    weekExams = exams.filter(exam => {
+                        const examDate = new Date(exam.examDate);
+                        return examDate >= startDate && examDate <= endDate;
+                    });
+
+                    displayTasks();
+                } catch (error) {
+                    console.error('Error fetching data:', error);
+                }
+            }
+
+            function getTimeSlot(timeStr) {
+                if (!timeStr) return 9; // Default to 9 AM if no time specified
+                const [hours] = timeStr.split(':').map(Number);
+                return hours;
+            }
+
+            async function deleteTask(taskId, element) {
+                try {
+                    const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    // Remove all instances of this task (including continued slots)
+                    const taskElements = document.querySelectorAll(`[data-task-id="${taskId}"]`);
+                    taskElements.forEach(el => el.remove());
+                    
+                    // Remove from weekTasks array
+                    weekTasks = weekTasks.filter(task => task.id !== taskId);
+                    
+                    // Show success message
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg';
+                    successMsg.textContent = 'Task deleted successfully';
+                    document.body.appendChild(successMsg);
+                    setTimeout(() => successMsg.remove(), 3000);
+                    
+                } catch (error) {
+                    console.error('Error deleting task:', error);
+                    alert('Failed to delete task. Please try again.');
+                }
+            }
+
+            function displayTasks() {
+                // Clear existing tasks
+                const cells = calendarTable.querySelectorAll('td:not(:first-child)');
+                cells.forEach(cell => {
+                    cell.innerHTML = '';
+                });
+
+                // Display tasks in the calendar
+                weekTasks.forEach(task => {
+                    const taskDate = new Date(task.dueDate);
+                    const dayIndex = taskDate.getDay();
+                    const startHour = getTimeSlot(task.startTime);
+                    const endHour = getTimeSlot(task.endTime);
+
+                    // Create task element that spans across time slots
+                    for (let hour = startHour; hour <= endHour; hour++) {
+                        const targetCell = calendarTable.querySelector(`tr:nth-child(${hour + 1}) td:nth-child(${dayIndex + 2})`);
+                        if (targetCell) {
+                            const taskElement = document.createElement('div');
+                            taskElement.className = 'task-item bg-green-200 p-1 rounded text-sm mb-1';
+                            taskElement.setAttribute('data-task-id', task.id);
+                            
+                            // Only show the full task details in the first time slot
+                            if (hour === startHour) {
+                                taskElement.innerHTML = `
+                                    <span>${task.startTime}-${task.endTime} ${task.title} (${task.subject})</span>
+                                    <i class="fas fa-times delete-btn" title="Delete task"></i>
+                                `;
+                                
+                                // Add delete button click handler
+                                const deleteBtn = taskElement.querySelector('.delete-btn');
+                                deleteBtn.onclick = (e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Are you sure you want to delete this task?')) {
+                                        deleteTask(task.id, taskElement);
+                                    }
+                                };
+                            } else {
+                                taskElement.className += ' opacity-50';
+                                taskElement.textContent = '(continued)';
+                            }
+                            
+                            targetCell.appendChild(taskElement);
+                        }
+                    }
+                });
+
+                // Display exams in the calendar
+                weekExams.forEach(exam => {
+                    const examDate = new Date(exam.examDate);
+                    const dayIndex = examDate.getDay();
+                    const startHour = getTimeSlot(exam.startTime);
+                    const endHour = startHour + Math.ceil(exam.duration / 60);
+
+                    // Create exam element that spans across time slots
+                    for (let hour = startHour; hour <= endHour; hour++) {
+                        const targetCell = calendarTable.querySelector(`tr:nth-child(${hour + 1}) td:nth-child(${dayIndex + 2})`);
+                        if (targetCell) {
+                            const examElement = document.createElement('div');
+                            examElement.className = 'task-item bg-orange-200 p-1 rounded text-sm mb-1';
+                            examElement.setAttribute('data-exam-id', exam.id);
+                            
+                            // Only show the full exam details in the first time slot
+                            if (hour === startHour) {
+                                examElement.innerHTML = `
+                                    <span>${exam.startTime} EXAM: ${exam.subject} - Module ${exam.moduleNumber}</span>
+                                    <i class="fas fa-times delete-btn" title="Delete exam"></i>
+                                `;
+                                
+                                // Add delete button click handler
+                                const deleteBtn = examElement.querySelector('.delete-btn');
+                                deleteBtn.onclick = (e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Are you sure you want to delete this exam?')) {
+                                        deleteExam(exam.id, examElement);
+                                    }
+                                };
+                            } else {
+                                examElement.className += ' opacity-50';
+                                examElement.textContent = '(exam continued)';
+                            }
+                            
+                            targetCell.appendChild(examElement);
+                        }
+                    }
+                });
+            }
+
+            async function deleteExam(examId, element) {
+                try {
+                    const response = await fetch(`${API_URL}/exams/${examId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    // Remove all instances of this exam
+                    const examElements = document.querySelectorAll(`[data-exam-id="${examId}"]`);
+                    examElements.forEach(el => el.remove());
+                    
+                    // Remove from weekExams array
+                    weekExams = weekExams.filter(exam => exam.id !== examId);
+                    
+                    // Show success message
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg';
+                    successMsg.textContent = 'Exam deleted successfully';
+                    document.body.appendChild(successMsg);
+                    setTimeout(() => successMsg.remove(), 3000);
+                    
+                } catch (error) {
+                    console.error('Error deleting exam:', error);
+                    alert('Failed to delete exam. Please try again.');
+                }
+            }
+
+            function highlightToday() {
+                // First, remove all highlights
+                const allCells = calendarTable.querySelectorAll('td');
+                allCells.forEach(cell => {
+                    cell.classList.remove('bg-green-100');
+                });
+
+                // Get today's actual date string
+                const today = new Date();
+                const todayString = today.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+
+                // Find today's column if it exists in the current week view
+                const weekDays = Array.from(document.querySelectorAll('.week-day'));
+                const todayColumnIndex = weekDays.findIndex(day => day.textContent.trim() === todayString);
+
+                // Only highlight if today is in the current week view
+                if (todayColumnIndex !== -1) {
+                    const rows = calendarTable.querySelectorAll('tbody tr');
+                    rows.forEach(row => {
+                        const todayCell = row.querySelector(`td:nth-child(${todayColumnIndex + 2})`);
+                        if (todayCell) {
+                            todayCell.classList.add('bg-green-100');
+                        }
+                    });
+                }
+            }
+
+            function showWeekView() {
+                weekView.classList.remove('hidden');
+                monthView.classList.add('hidden');
+                weekButton.classList.add('bg-green-600', 'text-white');
+                monthButton.classList.remove('bg-green-600', 'text-white');
+            }
+
+            function showMonthView() {
+                weekView.classList.add('hidden');
+                monthView.classList.remove('hidden');
+                monthButton.classList.add('bg-green-600', 'text-white');
+                weekButton.classList.remove('bg-green-600', 'text-white');
+                updateMonthView();
+            }
+
+            function updateDateRange() {
+                const startOfWeek = new Date(currentDate);
+                startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                
+                dateRange.textContent = `${startOfWeek.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}`;
+                updateWeekTable(startOfWeek);
+                fetchWeekTasks(startOfWeek, endOfWeek);
+            }
+
+            function updateWeekTable(startOfWeek) {
+                const days = Array.from(document.querySelectorAll('.week-day'));
+                days.forEach((day, index) => {
+                    const date = new Date(startOfWeek);
+                    date.setDate(startOfWeek.getDate() + index);
+                    day.textContent = date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+                });
+                highlightToday();
+            }
+
+            function shiftWeek(direction) {
+                currentDate.setDate(currentDate.getDate() + (direction * 7));
+                updateDateRange();
+            }
+
+            function updateMonthView() {
+                const monthTable = document.getElementById('month-table');
+                const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+                const startDate = new Date(firstDayOfMonth);
+                startDate.setDate(firstDayOfMonth.getDate() - firstDayOfMonth.getDay());
+                const endDate = new Date(lastDayOfMonth);
+                endDate.setDate(lastDayOfMonth.getDate() + (6 - lastDayOfMonth.getDay()));
+
+                let currentDateInView = new Date(startDate);
+                const rows = monthTable.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    row.querySelectorAll('td').forEach(cell => {
+                        cell.textContent = currentDateInView.getDate();
+                        if (currentDateInView.getMonth() !== currentDate.getMonth()) {
+                            cell.classList.add('text-gray-400');
+                        } else {
+                            cell.classList.remove('text-gray-400');
+                        }
+                        if (currentDateInView.toDateString() === today.toDateString()) {
+                            cell.classList.add('bg-green-100');
+                        } else {
+                            cell.classList.remove('bg-green-100');
+                        }
+                        currentDateInView.setDate(currentDateInView.getDate() + 1);
+                    });
+                });
+            }
+            function openDashboard() {
+                // Add logic to open the dashboard page if needed
+                // For now, it just highlights the icon
+                document.querySelectorAll('.nav-icon').forEach(icon => icon.classList.remove('active'));
+                event.target.classList.add('active');
+            }
+
+            function openCalendar() {
+                // Add logic to open the calendar page
+                // For now, it just highlights the icon
+                document.querySelectorAll('.nav-icon').forEach(icon => icon.classList.remove('active'));
+                event.target.classList.add('active');
+                // Redirect to calendar page or load calendar content
+            }
+
+            todayButton.addEventListener('click', () => {
+                currentDate = new Date();
+                updateDateRange();
+            });
+            weekButton.addEventListener('click', showWeekView);
+            monthButton.addEventListener('click', () => {
+                window.location.href = 'month.html';
+            });
+            leftArrow.addEventListener('click', () => shiftWeek(-1));
+            rightArrow.addEventListener('click', () => shiftWeek(1));
+
+            // Initial load
+            highlightToday();
+            updateDateRange();
+
+            function updateTimeIndicator() {
+                // Remove existing time indicator if any
+                const existingIndicator = document.querySelector('.current-time-indicator');
+                const existingLabel = document.querySelector('.current-time-label');
+                if (existingIndicator) existingIndicator.remove();
+                if (existingLabel) existingLabel.remove();
+
+                const now = new Date();
+                const hours = now.getHours();
+                const minutes = now.getMinutes();
+
+                // Get all time cells to calculate proper positioning
+                const timeRows = Array.from(document.querySelectorAll('#calendar-table tbody tr'));
+                if (!timeRows.length) return;
+
+                // Get the current row directly using the hour
+                const currentRow = timeRows[hours];
+                const nextRow = timeRows[Math.min(hours + 1, timeRows.length - 1)];
+                
+                if (!currentRow || !nextRow) return;
+
+                // Calculate position
+                const currentTop = currentRow.offsetTop;
+                const nextTop = nextRow.offsetTop;
+                const hourHeight = nextTop - currentTop;
+                const minuteOffset = (minutes / 60) * hourHeight;
+                const indicatorTop = currentTop + minuteOffset;
+
+                // Create and position the time indicator line
+                const indicator = document.createElement('div');
+                indicator.className = 'current-time-indicator';
+                indicator.style.top = `${indicatorTop}px`;
+
+                // Create and position the time label
+                const label = document.createElement('div');
+                label.className = 'current-time-label';
+                label.style.top = `${indicatorTop}px`;
+                label.textContent = now.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    hour12: true 
+                });
+
+                // Add elements to the calendar
+                const calendarTable = document.getElementById('calendar-table');
+                calendarTable.appendChild(indicator);
+                calendarTable.appendChild(label);
+
+                // Find if today is in view
+                const today = new Date();
+                const weekDays = Array.from(document.querySelectorAll('.week-day'));
+                const todayColumnIndex = weekDays.findIndex(day => 
+                    day.textContent.trim() === today.toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        month: 'numeric', 
+                        day: 'numeric' 
+                    })
+                );
+
+                // Only scroll if today is in view
+                if (todayColumnIndex !== -1) {
+                    const container = calendarTable.parentElement;
+                    const containerHeight = container.clientHeight;
+                    
+                    // Calculate scroll position to center the current time
+                    let scrollPosition = indicatorTop - (containerHeight / 2);
+                    
+                    // Ensure we don't scroll past the table bounds
+                    scrollPosition = Math.max(0, Math.min(scrollPosition, calendarTable.scrollHeight - containerHeight));
+                    
+                    // Only scroll on initial load or significant time changes
+                    if (!container.dataset.initialScrollDone) {
+                        container.scrollTo({
+                            top: scrollPosition,
+                            behavior: 'smooth'
+                        });
+                        container.dataset.initialScrollDone = 'true';
+                    }
+                }
+            }
+
+            // Update time indicator immediately and then every minute
+            updateTimeIndicator();
+            setInterval(updateTimeIndicator, 60000);
+
+            // Add proper styling for the time indicator
+            const style = document.createElement('style');
+            style.textContent = `
+                .current-time-indicator {
+                    position: absolute;
+                    left: 0;
+                    right: 0;
+                    height: 2px;
+                    background-color: #EF4444;
+                    z-index: 100;
+                    pointer-events: none;
+                }
+                .current-time-label {
+                    position: absolute;
+                    left: 0;
+                    transform: translateY(-50%);
+                    background-color: #EF4444;
+                    color: white;
+                    padding: 2px 4px;
+                    border-radius: 3px;
+                    font-size: 12px;
+                    z-index: 100;
+                    width: fit-content;
+                }
+                #calendar-table {
+                    position: relative;
+                }
+                .time-cell {
+                    position: relative;
+                    height: 60px;
+                    padding: 0 !important;
+                }
+                #week-view {
+                    height: calc(100vh - 128px);
+                    overflow-y: auto;
+                }
+            `;
+            document.head.appendChild(style);
+        });
+    </script>
+    <style>
+        .nav-icon {
+            transition: color 0.3s;
+        }
+        .nav-icon:hover, .nav-icon.active {
+            color: #10B981; /* Tailwind's green-500 */
+        }
+        .task-item {
+            position: relative;
+            padding-right: 20px;
+        }
+        .delete-btn {
+            position: absolute;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #EF4444;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            font-size: 12px;
+        }
+        .delete-btn:hover {
+            opacity: 1;
+        }
+        .current-time-indicator {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: #EF4444;
+            z-index: 100;
+            pointer-events: none;
+        }
+        .current-time-label {
+            position: absolute;
+            left: 0;
+            transform: translateY(-50%);
+            background-color: #EF4444;
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 12px;
+            z-index: 100;
+            width: fit-content;
+        }
+        #calendar-table {
+            position: relative;
+        }
+        .time-cell {
+            position: relative;
+            height: 60px; /* Make each time slot 60px high */
+            padding: 0 !important;
+        }
+        #week-view {
+            height: calc(100vh - 128px); /* Adjust based on your header heights */
+            overflow-y: auto;
+        }
+        .table-container {
+            position: relative;
+        }
+    </style>
+</head>
+<body class="h-screen flex">
+    <!-- Sidebar -->
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="bg-gray-800 text-white w-16 md:w-20 lg:w-24 flex flex-col items-center py-4">
+            <div class="mb-8">
+                <a href="index.html" class="nav-icon"><i class="fas fa-graduation-cap text-2xl"></i></a>
+            </div>
+            <div class="flex flex-col space-y-8">
+                <a href="index.html"><i class="fas fa-tachometer-alt text-xl nav-icon"></i></a>
+                <a href="calendar.html"><i class="fas fa-calendar-alt text-xl nav-icon active"></i></a>
+                <a href="exams.html"><i class="fas fa-check-square text-xl nav-icon"></i></a>
+                <a href="timetable.html"><i class="fas fa-calendar text-xl nav-icon"></i></a>
+            </div>
+            <div class="mt-auto mb-4">
+                <img alt="User profile picture" class="rounded-full" height="40"
+                     src="https://storage.googleapis.com/a1aa/image/cnw81C_Eek9sgczYkiZVsBm8QPhWE4JxiqAEU5cey4U.jpg"
+                     width="40"/>
+            </div>
+        </div>
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+        <!-- Header -->
+        <div class="flex items-center justify-between bg-white p-4 border-b">
+            <h1 class="text-xl font-semibold">Calendar</h1>
+        </div>
+        <!-- Calendar Navigation -->
+        <div class="flex items-center justify-between bg-white p-4 border-b">
+            <div class="flex items-center">
+                <button class="text-green-600 hover:text-green-800" id="left-arrow">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="mx-4" id="date-range">23-29 Mar, 2025</span>
+                <button class="text-green-600 hover:text-green-800" id="right-arrow">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="flex items-center">
+                <button class="border px-4 py-1 rounded mr-2 hover:bg-green-600 hover:text-white" id="today-button">Today</button>
+                <button class="bg-green-600 text-white px-4 py-1 rounded mr-2" id="week-button">Week</button>
+                <a href="month.html" class="border px-4 py-1 rounded hover:bg-green-600 hover:text-white" id="month-button">Month</a>
+            </div>
+        </div>
+        <!-- Calendar Grid -->
+        <div class="flex-1 overflow-auto">
+            <!-- Week View -->
+            <div id="week-view">
+                <table class="w-full table-fixed border-collapse" id="calendar-table">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="w-1/12 border p-2">Time</th>
+                            <th class="w-1/7 border p-2 week-day">Sun 3/23</th>
+                            <th class="w-1/7 border p-2 week-day">Mon 3/24</th>
+                            <th class="w-1/7 border p-2 week-day">Tue 3/25</th>
+                            <th class="w-1/7 border p-2 week-day">Wed 3/26</th>
+                            <th class="w-1/7 border p-2 week-day">Thu 3/27</th>
+                            <th class="w-1/7 border p-2 week-day">Fri 3/28</th>
+                            <th class="w-1/7 border p-2 week-day">Sat 3/29</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Time slots -->
+                        <tr>
+                            <td class="border p-2">12AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">1AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">2AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">3AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">4AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">5AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">6AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">7AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">8AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">9AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">10AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">11AM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">12PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">1PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">2PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">3PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">4PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">5PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2 bg-green-100"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">6PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">7PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">8PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">9PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">10PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                        <tr>
+                            <td class="border p-2">11PM</td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                            <td class="border p-2"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

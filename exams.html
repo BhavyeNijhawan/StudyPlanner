@@ -1,0 +1,254 @@
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Exams</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        .nav-icon {
+            transition: color 0.3s;
+        }
+        .nav-icon:hover, .nav-icon.active {
+            color: #10B981;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+<div class="flex h-screen">
+    <!-- Sidebar -->
+    <div class="bg-gray-800 text-white w-16 md:w-20 lg:w-24 flex flex-col items-center py-4">
+        <div class="mb-8">
+            <a href="index.html" class="nav-icon"><i class="fas fa-graduation-cap text-2xl"></i></a>
+        </div>
+        <div class="flex flex-col space-y-8">
+            <a href="index.html"><i class="fas fa-tachometer-alt text-xl nav-icon"></i></a>
+            <a href="calendar.html"><i class="fas fa-calendar-alt text-xl nav-icon"></i></a>
+            <a href="exams.html"><i class="fas fa-check-square text-xl nav-icon active"></i></a>
+            <a href="timetable.html"><i class="fas fa-calendar text-xl nav-icon"></i></a>
+        </div>
+        <div class="mt-auto mb-4">
+            <img alt="User profile picture" class="rounded-full" height="40"
+                 src="https://storage.googleapis.com/a1aa/image/cnw81C_Eek9sgczYkiZVsBm8QPhWE4JxiqAEU5cey4U.jpg"
+                 width="40"/>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 p-4">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 class="text-xl font-semibold">Exams</h1>
+                <p class="text-gray-600" id="currentYear">2025</p>
+            </div>
+            <button class="bg-green-500 text-white px-4 py-2 rounded-lg" onclick="openModal()">
+                <i class="fas fa-plus"></i> New Exam
+            </button>
+        </div>
+
+        <!-- Current Exams Section -->
+        <div class="bg-white p-4 rounded-lg shadow-md">
+            <h2 class="text-lg font-semibold mb-4">Current Exams</h2>
+            <div id="noExamsMessage" class="text-center text-gray-600">
+                <p>No exams scheduled</p>
+            </div>
+            <div id="examsList" class="hidden space-y-4"></div>
+        </div>
+    </div>
+</div>
+
+<!-- New Exam Modal -->
+<div id="examModal" class="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-11/12 md:w-1/2 lg:w-1/3">
+        <h2 class="text-xl font-semibold mb-4">New Exam</h2>
+        <form id="examForm" onsubmit="addExam(event)">
+            <div class="mb-4">
+                <label class="block text-gray-700">Subject</label>
+                <div class="flex">
+                    <select id="subjectDropdown" class="flex-1 border border-gray-300 rounded-lg p-2" required>
+                        <option value="">Select Subject</option>
+                        <option>Math</option>
+                        <option>Science</option>
+                        <option>History</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Module Number</label>
+                <input type="text" id="moduleNumber" class="w-full border border-gray-300 rounded-lg p-2" required/>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Date of Exam</label>
+                <input type="text" id="examDate" class="w-full border border-gray-300 rounded-lg p-2" required/>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Start Time</label>
+                <input type="text" id="startTime" class="w-full border border-gray-300 rounded-lg p-2" required/>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Duration (minutes)</label>
+                <input type="number" id="duration" class="w-full border border-gray-300 rounded-lg p-2" required/>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Seat Number</label>
+                <input type="text" id="seatNumber" class="w-full border border-gray-300 rounded-lg p-2" required/>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700">Room Number</label>
+                <input type="text" id="roomNumber" class="w-full border border-gray-300 rounded-lg p-2" required/>
+            </div>
+            <div class="flex justify-end">
+                <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded-lg mr-2" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded-lg">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:5500/api';
+    let exams = [];
+
+    // Initialize date and time pickers
+    document.addEventListener('DOMContentLoaded', function() {
+        flatpickr("#examDate", {
+            defaultDate: "today"
+        });
+        
+        flatpickr("#startTime", {
+            enableTime: true,
+            noCalendar: true,
+            dateFormat: "H:i",
+            time_24hr: true
+        });
+        
+        fetchExams();
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+    });
+
+    async function fetchExams() {
+        try {
+            const response = await fetch(`${API_URL}/exams`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            exams = await response.json();
+            updateExamsList();
+        } catch (error) {
+            console.error('Error fetching exams:', error);
+        }
+    }
+
+    function updateExamsList() {
+        const examsList = document.getElementById('examsList');
+        const noExamsMessage = document.getElementById('noExamsMessage');
+        
+        if (exams.length === 0) {
+            examsList.classList.add('hidden');
+            noExamsMessage.classList.remove('hidden');
+            return;
+        }
+
+        examsList.classList.remove('hidden');
+        noExamsMessage.classList.add('hidden');
+        examsList.innerHTML = '';
+
+        exams.forEach(exam => {
+            const examElement = document.createElement('div');
+            examElement.className = 'bg-orange-100 p-4 rounded-lg';
+            examElement.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-semibold">${exam.subject} - Module ${exam.moduleNumber}</h3>
+                        <p class="text-sm text-gray-600">Date: ${exam.examDate}</p>
+                        <p class="text-sm text-gray-600">Time: ${exam.startTime} (${exam.duration} minutes)</p>
+                        <p class="text-sm text-gray-600">Room: ${exam.roomNumber}, Seat: ${exam.seatNumber}</p>
+                    </div>
+                    <button onclick="deleteExam(${exam.id})" class="text-red-500 hover:text-red-700">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            examsList.appendChild(examElement);
+        });
+    }
+
+    async function addExam(event) {
+        event.preventDefault();
+        
+        const examData = {
+            subject: document.getElementById('subjectDropdown').value,
+            moduleNumber: document.getElementById('moduleNumber').value,
+            examDate: document.getElementById('examDate').value,
+            startTime: document.getElementById('startTime').value,
+            duration: document.getElementById('duration').value,
+            seatNumber: document.getElementById('seatNumber').value,
+            roomNumber: document.getElementById('roomNumber').value
+        };
+
+        try {
+            const response = await fetch(`${API_URL}/exams`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(examData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('Exam created:', result);
+            closeModal();
+            fetchExams();
+        } catch (error) {
+            console.error('Error creating exam:', error);
+            alert('Failed to create exam. Please try again.');
+        }
+    }
+
+    async function deleteExam(examId) {
+        if (!confirm('Are you sure you want to delete this exam?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/exams/${examId}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            // Show success message
+            const successMsg = document.createElement('div');
+            successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg';
+            successMsg.textContent = 'Exam deleted successfully';
+            document.body.appendChild(successMsg);
+            setTimeout(() => successMsg.remove(), 3000);
+            
+            // Refresh exams list
+            fetchExams();
+            
+        } catch (error) {
+            console.error('Error deleting exam:', error);
+            alert('Failed to delete exam. Please try again.');
+        }
+    }
+
+    function openModal() {
+        document.getElementById('examForm').reset();
+        document.getElementById('examModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('examModal').classList.add('hidden');
+    }
+</script>
+</body>
+</html> 
