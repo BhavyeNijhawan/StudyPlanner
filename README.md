@@ -1,76 +1,125 @@
-# Study Planner
+# 📚 Study Planner
 
-A web-based study planner application that helps you manage your tasks, classes, and exams with a calendar view.
+A modern, intuitive web application designed to help students manage their academic life efficiently. Track your tasks, exams, and class schedules all in one place.
 
-## Features
+🔗 **Live Demo**: [Study Planner](https://studyplanner3.onrender.com/index.html)
 
-- Create and manage tasks with details like subject, type, and due date
-- View tasks in a daily dashboard
-- Weekly calendar view with task visualization
-- Add custom subjects
-- Delete tasks
+![Study Planner Logo](https://storage.googleapis.com/a1aa/image/cnw81C_Eek9sgczYkiZVsBm8QPhWE4JxiqAEU5cey4U.jpg)
 
-## Setup Instructions
+## ✨ Features
 
-### Backend Setup
+### 📋 Task Management
+- Create and track academic tasks
+- Set due dates and time slots
+- Categorize tasks by subject and type
+- Real-time task deletion and updates
 
-1. Make sure you have Python 3.8+ installed
-2. Navigate to the backend directory:
+### 📅 Exam Scheduling
+- Schedule and manage exams
+- Track exam details including:
+  - Module numbers
+  - Room numbers
+  - Seat assignments
+  - Duration
+  - Start times
+
+### 📊 Dashboard
+- Overview of daily activities
+- Quick stats for tasks and exams
+- Intuitive calendar view
+- Easy navigation between different views
+
+### 📆 Calendar Views
+- Monthly calendar view
+- Weekly schedule view
+- Daily task overview
+- Visual indicators for tasks and exams
+
+## 🛠️ Technologies Used
+
+### Frontend
+- HTML5
+- Tailwind CSS
+- JavaScript (Vanilla)
+- Font Awesome Icons
+- Flatpickr (for date/time picking)
+
+### Backend
+- Python 3.11
+- Flask Framework
+- SQLAlchemy (ORM)
+- PostgreSQL (Production)
+- SQLite (Development)
+
+### Deployment
+- Frontend: Render (Static Site)
+- Backend: Render (Web Service)
+- Database: Render PostgreSQL
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Python 3.11 or higher
+- Web browser (Chrome/Firefox/Safari)
+
+### Local Development
+1. Clone the repositories:
    ```bash
-   cd backend
+   git clone https://github.com/YourUsername/StudyPlanner.git
+   git clone https://github.com/YourUsername/StudyPlannerBackend.git
    ```
-3. Create a virtual environment:
+
+2. Backend Setup:
    ```bash
-   python -m venv venv
-   ```
-4. Activate the virtual environment:
-   - Windows:
-     ```bash
-     .\venv\Scripts\activate
-     ```
-   - Unix/MacOS:
-     ```bash
-     source venv/bin/activate
-     ```
-5. Install dependencies:
-   ```bash
+   cd StudyPlannerBackend
    pip install -r requirements.txt
-   ```
-6. Run the Flask application:
-   ```bash
+   python init_db.py
    python app.py
    ```
-   The backend server will start at http://localhost:5000
 
-### Frontend Setup
+3. Frontend:
+   - Open the HTML files in a web browser
+   - Or use a local server like Live Server in VS Code
 
-The frontend is static HTML/JavaScript and doesn't require any build steps. Simply:
+## 📱 Features by Page
 
-1. Open `index.html` in your web browser to access the dashboard
-2. Click on the calendar icon in the sidebar to switch to the calendar view
+### Dashboard (index.html)
+- Overview of today's tasks and exams
+- Quick task creation
+- Task categorization by subject
 
-## Usage
+### Calendar View (calendar.html)
+- Weekly view of tasks and exams
+- Visual task organization
+- Quick task deletion
 
-1. **Adding Tasks**:
-   - Click the "New Task" button on the dashboard
-   - Fill in the task details in the popup form
-   - Click "Save" to create the task
+### Monthly View (month.html)
+- Monthly calendar overview
+- Task and exam distribution
+- Easy navigation between months
 
-2. **Viewing Tasks**:
-   - Dashboard shows today's tasks
-   - Calendar view shows tasks for the entire week
-   - Use the navigation arrows to move between weeks
+### Exam Management (exams.html)
+- Comprehensive exam scheduling
+- Exam detail management
+- Room and seat tracking
 
-3. **Deleting Tasks**:
-   - Click the trash icon next to a task to delete it
+### Timetable (timetable.html)
+- Weekly class schedule
+- Subject-wise organization
+- Time slot management
 
-4. **Adding Subjects**:
-   - Click the "+" button next to the subject dropdown when creating a task
-   - Enter the new subject name
-   - Click "Add" to add it to the list
+## 🔒 Environment Variables
+- `FLASK_ENV`: Set to 'production' in deployment
+- `DATABASE_URL`: PostgreSQL connection string (production)
+- `PYTHON_VERSION`: 3.11.0
 
-## Tech Stack
+## 👥 Contributing
+Feel free to fork this repository and submit pull requests. For major changes, please open an issue first to discuss what you would like to change.
 
-- Frontend: HTML, JavaScript, TailwindCSS
-- Backend: Python, Flask, SQLite
-- Additional libraries: Flatpickr for date picking 
+## 📄 License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+- Tailwind CSS for the beautiful UI components
+- Flask community for the excellent documentation
+- Render for hosting services 
