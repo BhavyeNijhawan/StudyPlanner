@@ -4,8 +4,6 @@ A modern, intuitive web application designed to help students manage their acade
 
 🔗 **Live Demo**: [Study Planner](https://studyplanner3.onrender.com/index.html)
 
-![Study Planner Logo](https://storage.googleapis.com/a1aa/image/cnw81C_Eek9sgczYkiZVsBm8QPhWE4JxiqAEU5cey4U.jpg)
-
 ## ✨ Features
 
 ### 📋 Task Management
