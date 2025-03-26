@@ -16,10 +16,16 @@ services:
           name: sp-db
           property: connectionString
 
-  - type: static
+  - type: web
     name: sp-frontend
+    env: static
     buildCommand: null
-    staticPublishPath: ./
+    staticPublishPath: ./sp
+    headers:
+      - source: /*
+        headers:
+          - key: Cache-Control
+            value: no-cache
     routes:
       - type: rewrite
         source: /*
